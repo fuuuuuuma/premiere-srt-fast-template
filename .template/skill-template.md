@@ -1,17 +1,18 @@
 # スキルテンプレート
 
-壁打ちの回答を元に、以下の {{変数}} を埋めてスキルファイルを生成してください。
-生成したファイルは `~/.claude/commands/{{COMMAND_NAME}}.md` に保存する。
+以下の {{変数}} を埋めてスキルファイルを生成してください。
+生成したファイルは `~/.claude/commands/srt-fast.md` に保存する。
 
 ## 変数一覧
 
-| 変数 | 対応する質問 |
+| 変数 | 内容 |
 |---|---|
-| `{{COMMAND_NAME}}` | Q9 コマンド名 |
-| `{{PROJECT_ROOT}}` | このリポジトリの絶対パス（`pwd` で取得。ユーザーには聞かない） |
-| `{{INPUT_DIR}}` | Q7 音声/動画の読み込み場所 |
-| `{{OUTPUT_DIR}}` | Q8 SRT出力先 |
-| `{{USE_XML}}` | Q10 カット点同期XMLを使うか |
+| `{{PROJECT_ROOT}}` | このリポジトリの絶対パス（clone先。`pwd` で取得するか、Step Aで
+  ユーザーが指定した保存先。ユーザーには改めて聞かない） |
+
+コマンド名は常に `srt-fast` で固定（{{変数}}にしない）。出力先は
+`scripts/chunk_tools/prepare_text_parts.py` が `{{PROJECT_ROOT}}/output/srt/<ファイル名>/`
+に自動決定するため、これも{{変数}}にしない。
 
 ---
 
@@ -22,28 +23,26 @@
 description: WAV/動画音声を単一パスGPU転写（mlx-whisper）した後、fulltextを意味区切りでN分割しLLM改行だけを並列化してSRT字幕を高速生成する。日本語トーク動画用。
 ---
 
-# WAV → SRT 高速生成 (/{{COMMAND_NAME}})
+# WAV → SRT 高速生成 (/srt-fast)
 
 ## 使い方
 
 ```
-/{{COMMAND_NAME}} /path/to/audio_or_video
+/srt-fast /path/to/audio_or_video
 ```
 
 パート数を変えたい場合は `prepare_text_parts.py --n <数>`（既定0=文字数から自動、上限10）。
-{{#USE_XML}}
 カット点同期 XML がある場合は `--xml "<XML>"` を付けると manifest に記録され、
-Step 4 の `--from-text` に引き渡される。
-{{/USE_XML}}
+Step 4 の `--from-text` に引き渡される（任意機能。使わなくてよい）。
 
 ## 実行手順
 
 ### Step 0: チャンネル設定の確認
 
 `{{PROJECT_ROOT}}/config/channel_profile.md` を読む。**存在しない場合のみ**、
-チャンネル名・目標文字数・固有名詞・半角スペースの好みを質問してから
-`config/channel_profile.example.md` の書式で作成する（通常は導入時の壁打ちで
-既に作成済みのはずなので、この質問が発生するのは再セットアップ時のみ）。
+目標文字数・固有名詞を質問してから `config/channel_profile.example.md` の書式で
+作成する（通常は導入時の壁打ちで既に作成済みのはずなので、この質問が発生するのは
+再セットアップ時のみ）。
 
 ### Step 1: 入力確認
 
@@ -60,7 +59,8 @@ python3 "{{PROJECT_ROOT}}/scripts/chunk_tools/prepare_text_parts.py" "<入力の
 mlx-whisper が無い環境では自動的に CPU 並列転写にフォールバックするため、より時間がかかる場合がある）。
 10分超が見込まれる長尺は、`run_in_background: true` で実行し完了通知を待ってから次へ進む。
 
-標準出力の `MANIFEST: <path>` が `<stem>.parts.json` の絶対パス。
+標準出力の `MANIFEST: <path>` が `<stem>.parts.json` の絶対パス。この manifest の
+`out_dir` フィールドが以降のステップで使う出力ディレクトリ（`{{PROJECT_ROOT}}/output/srt/<stem>/`）。
 
 ### Step 3: manifest を読み、改行エージェントをN体並列起動（直Agent・1メッセージ）
 
@@ -100,7 +100,7 @@ Read: {parts[i].path}
 ### Step 4: 組み立て＋QA（bash直・エージェント不使用）
 
 ```bash
-cd "{{OUTPUT_DIR}}" && python3 -c "
+cd "<out_dir>" && python3 -c "
 from pathlib import Path
 import json
 m = json.loads(Path('<stem>.parts.json').read_text())
@@ -113,9 +113,8 @@ print(len(lines), 'lines')
   --from-text "<stem>.fast.lines.txt" --segments "<stem>.segments.json" -o "<stem>.fast.srt"
 ```
 
-{{#USE_XML}}
-manifest の `xml` が null でなければ `--from-text` コマンドに `--xml "<manifestのxml>"` を追加する。
-{{/USE_XML}}
+`<out_dir>` は manifest の `out_dir` フィールド（Step 2参照）。manifest の `xml` が
+null でなければ `--from-text` コマンドに `--xml "<manifestのxml>"` を追加する。
 標準出力末尾の `QA_JSON: {...}` を読む。
 
 ### Step 5: QA修復（メインループが直接・最大2周）
@@ -129,7 +128,7 @@ manifest の `xml` が null でなければ `--from-text` コマンドに `--xml
 ### Step 6: 掃除と完了報告
 
 ```bash
-rm -f "{{OUTPUT_DIR}}/<stem>".part*.txt "{{OUTPUT_DIR}}/<stem>".part*.lines.txt
+rm -f "<out_dir>/<stem>".part*.txt "<out_dir>/<stem>".part*.lines.txt
 ```
 
 1. 最終 SRT の絶対パス（`<stem>.fast.srt`）
@@ -137,12 +136,10 @@ rm -f "{{OUTPUT_DIR}}/<stem>".part*.txt "{{OUTPUT_DIR}}/<stem>".part*.lines.txt
 3. 所要時間（prepare / 並列改行 / 組立・修復）
 4. 「Premiere Pro にインポートできます」
 
-## 入出力パス（このリポジトリ固有の設定値）
+## 新しい固有名詞に気づいたら
 
-- 音声/動画の読み込み場所（既定）: `{{INPUT_DIR}}`
-- SRT出力先: `{{OUTPUT_DIR}}`
-- 新しい固有名詞誤認識を見つけたら `{{PROJECT_ROOT}}/config/corrections.local.json` に
-  追記し、上記 --from-text を再実行すれば表示行にも即反映される。
+`{{PROJECT_ROOT}}/config/corrections.local.json` に追記し、Step 4 の `--from-text` を
+再実行すれば表示行にも即反映される。
 
 ## CPUフォールバックについて
 

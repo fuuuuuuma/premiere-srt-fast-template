@@ -2,16 +2,20 @@
 
 WAV/動画音声から日本語トーク動画用のSRT字幕を高速生成する `/srt-fast` の **セットアップウィザード** テンプレートです。
 
-## 使い方
+## 使い方（Claude Code）
 
-```bash
-git clone https://github.com/fuuuuuuma/premiere-srt-fast-template.git
-cd premiere-srt-fast-template
-claude
-```
+ターミナルで `git clone` する必要はありません。Claude Code に次のメッセージを渡すだけです。
 
-Claude Code を起動すると壁打ちウィザードが始まります。11項目の質問に答えるだけで、
-自分のチャンネルに合わせた `/srt-fast` スキルが `~/.claude/commands/` に生成されます。
+> `https://github.com/fuuuuuuma/premiere-srt-fast-template` の CLAUDE.md に従ってセットアップして
+
+壁打ち（3問）が始まります。答え終わると保存先フォルダに自動でセットアップが作られ、
+`/srt-fast` がすぐ使えるようになります。
+
+## 壁打ちで聞かれること
+
+1. テロップ1行の目標文字数（デフォルト: 平均14字前後・25字超1%未満）
+2. このチャンネルでよく出る固有名詞・専門用語・人名（Whisperが誤変換しそうなもの）
+3. セットアップの保存先フォルダ（絶対パス）
 
 ## 何をしてくれるか
 
@@ -29,17 +33,17 @@ Claude Code を起動すると壁打ちウィザードが始まります。11項
 
 ## 壁打ちで生成されるもの
 
-- `~/.claude/commands/{{コマンド名}}.md` — Claude Code スキルファイル
-- `config/channel_profile.md` — チャンネル名・目標文字数・スペース使いの好み
+- `~/.claude/commands/srt-fast.md` — Claude Code スキルファイル
+- `config/channel_profile.md` — 目標文字数の設定
 - `config/corrections.local.json` — このチャンネル固有の固有名詞・言い間違い辞書
 
 ## 必要な環境
 
-- Claude Code CLI
+- Claude Code（CLI・デスクトップアプリいずれも可）
 - Python 3.9 以降
 - `faster-whisper`（`mlx-whisper` は Apple Silicon Mac のみ・任意だが高速）
 - `ffmpeg`
-- 未インストールの場合はウィザードがセットアップ手順を生成する
+- 未インストールの場合はウィザードがセットアップ手順を案内する
 
 ## 学習サイクル
 
