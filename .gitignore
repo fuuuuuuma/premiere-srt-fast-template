@@ -1,0 +1,16 @@
+output/*
+!output/srt/
+output/srt/*
+!output/srt/.gitkeep
+input/*
+!input/.gitkeep
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+venv/
+*.egg-info/
+
+# チャンネル固有設定（壁打ちで生成される個人設定。テンプレは config/*.example.*）
+config/channel_profile.md
+config/corrections.local.json
